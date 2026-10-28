@@ -58,7 +58,8 @@ the portable `release\TV Launcher.exe`.
 - Press **S** in the app to change the token.
 - Click the **Search movies & shows** bar at the top (or press `/` / `F`) to search
   TMDB as you type. Picking a result — by click or Enter — opens a details panel
-  with the poster, year, rating, genres, overview, and library status.
+  with the poster, year, rating, genres, tagline, overview, cast, director or
+  creator, runtime or episode count, release date, country, and library status.
 - In the details panel, a title already in `C:\Mvs` offers **Play now** (films) or
   **Open series** (shows), plus **More like this**. A title that is not in the
   library offers **More like this** and **View on TMDB**.

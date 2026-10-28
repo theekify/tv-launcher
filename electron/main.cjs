@@ -3,7 +3,14 @@ const path = require('path')
 const fs = require('fs')
 const { spawn } = require('child_process')
 const { scanLibrary } = require('./library.cjs')
-const { getMeta, verifyToken, resetCache, searchTitles, getSimilar } = require('./tmdb.cjs')
+const {
+  getMeta,
+  verifyToken,
+  resetCache,
+  searchTitles,
+  getSimilar,
+  getDetails,
+} = require('./tmdb.cjs')
 const { readToken, saveToken } = require('./config.cjs')
 
 // `electron .` is now the production path; `electron . --dev` uses Vite.
@@ -52,6 +59,7 @@ ipcMain.handle('library:scan', async () => {
 ipcMain.handle('movies:meta', (_e, title, year, kind) => getMeta(title, year, kind))
 ipcMain.handle('movies:search', (_e, query) => searchTitles(query))
 ipcMain.handle('movies:similar', (_e, id, kind) => getSimilar(id, kind))
+ipcMain.handle('movies:details', (_e, id, kind) => getDetails(id, kind))
 
 ipcMain.handle('app:info', () => ({ hasToken: Boolean(readToken()), moviesDir: MOVIES_DIR }))
 

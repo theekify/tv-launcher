@@ -88,8 +88,86 @@ function Card({ item, index, selected, local, onHover, onPick }) {
 
 const isLocalShow = (entry) => entry?.kind === 'show' || Array.isArray(entry?.episodes)
 
-function DetailsPanel({ item, local, actions, actionIndex, onHoverAction, onAction, onClose }) {
-  const meta = [item.year, item.rating && `★ ${item.rating}`, ...(item.genres || [])].filter(Boolean)
+const formatRuntime = (minutes) => {
+  const value = Number(minutes)
+  if (!value || value < 1) return null
+  const hours = Math.floor(value / 60)
+  const rest = value % 60
+  if (!hours) return `${rest}m`
+  return rest ? `${hours}h ${rest}m` : `${hours}h`
+}
+
+const formatDate = (value) => {
+  if (!value) return null
+  const date = new Date(`${value}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+const countryLabel = (name) => {
+  if (name === 'United States of America') return 'USA'
+  if (name === 'United Kingdom') return 'UK'
+  return name
+}
+
+function DetailsPanel({
+  item,
+  local,
+  actions,
+  actionIndex,
+  onHoverAction,
+  onAction,
+  onClose,
+  extra,
+  loading,
+}) {
+  const genres = (extra?.genres?.length ? extra.genres : item.genres || []).slice(0, 3)
+  const meta = [item.year, item.rating && `★ ${item.rating}`, ...genres].filter(Boolean)
+  const overview = extra?.overview || item.overview
+  const cast = extra?.cast || []
+  const info = []
+
+  if (extra) {
+    const people =
+      item.kind === 'tv'
+        ? extra.creators?.length
+          ? extra.creators
+          : extra.directors
+        : extra.directors
+    if (people?.length) {
+      info.push({
+        label: item.kind === 'tv' ? 'Created by' : 'Directed by',
+        value: people.join(', '),
+      })
+    }
+
+    const runtime = formatRuntime(extra.runtime)
+    if (runtime) {
+      info.push({ label: item.kind === 'tv' ? 'Episode length' : 'Runtime', value: runtime })
+    }
+
+    if (item.kind === 'tv' && extra.seasons) {
+      info.push({
+        label: 'Episodes',
+        value: `${extra.seasons} season${extra.seasons > 1 ? 's' : ''}${
+          extra.episodes ? ` · ${extra.episodes} episodes` : ''
+        }`,
+      })
+    }
+
+    const released = formatDate(extra.releaseDate)
+    if (released) {
+      info.push({ label: item.kind === 'tv' ? 'First aired' : 'Released', value: released })
+    }
+
+    if (item.kind === 'tv' && extra.status) {
+      info.push({ label: 'Status', value: extra.status })
+    }
+
+    if (extra.countries?.length) {
+      info.push({ label: 'Country', value: extra.countries.map(countryLabel).join(', ') })
+    }
+  }
 
   return (
     <div
@@ -168,11 +246,72 @@ function DetailsPanel({ item, local, actions, actionIndex, onHoverAction, onActi
               {meta.join(' · ')}
             </p>
 
+            {extra?.tagline && (
+              <p className="mt-2 text-[12px] italic leading-relaxed text-white/40">
+                “{extra.tagline}”
+              </p>
+            )}
+
             <p className="mt-4 max-h-36 overflow-y-auto pr-3 text-sm leading-relaxed text-white/55">
-              {item.overview || 'No overview available for this title yet.'}
+              {overview || 'No overview available for this title yet.'}
             </p>
 
-            <p className="mt-4 text-[9px] uppercase tracking-[0.2em] text-white/25">
+            {info.length > 0 && (
+              <div className="mt-5 flex flex-wrap gap-x-7 gap-y-3 border-t border-white/[0.07] pt-4">
+                {info.map((row) => (
+                  <div key={row.label} className="min-w-[86px] max-w-[190px]">
+                    <p className="text-[8px] font-semibold uppercase tracking-[0.22em] text-white/25">
+                      {row.label}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-snug text-white/65">{row.value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {(loading || cast.length > 0) && (
+              <div className="mt-5">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.3em] text-white/30">
+                  Cast
+                </p>
+                <div className="mt-2 flex flex-wrap gap-3.5">
+                  {loading
+                    ? Array.from({ length: 6 }, (_, index) => (
+                        <div key={index} className="w-[76px] shrink-0 animate-pulse text-center">
+                          <div className="mx-auto h-12 w-12 rounded-full bg-white/[0.06]" />
+                          <div className="mx-auto mt-2 h-2 w-14 rounded bg-white/[0.05]" />
+                          <div className="mx-auto mt-1 h-1.5 w-10 rounded bg-white/[0.04]" />
+                        </div>
+                      ))
+                    : cast.slice(0, 6).map((person, index) => (
+                        <div key={`${person.name}-${index}`} className="w-[76px] shrink-0 text-center">
+                          <div className="mx-auto h-12 w-12 overflow-hidden rounded-full border border-white/10 bg-white/[0.05]">
+                            {person.profile ? (
+                              <img
+                                src={person.profile}
+                                alt=""
+                                draggable={false}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-[12px] font-medium text-white/35">
+                                {person.name.slice(0, 1)}
+                              </div>
+                            )}
+                          </div>
+                          <p className="mt-1.5 line-clamp-2 min-h-[2.4em] text-[10px] leading-[1.2] text-white/70">
+                            {person.name}
+                          </p>
+                          <p className="truncate text-[8px] uppercase tracking-[0.08em] text-white/25">
+                            {person.character}
+                          </p>
+                        </div>
+                      ))}
+                </div>
+              </div>
+            )}
+
+            <p className="mt-5 text-[9px] uppercase tracking-[0.2em] text-white/25">
               {local
                 ? `Ready to ${isLocalShow(local) ? 'open' : 'play'} from C:\\Mvs`
                 : 'Not in your library — add it to C:\\Mvs to play it here'}
@@ -231,6 +370,8 @@ export default function SimilarFinder({ onClose, library, hasToken, onNeedToken,
   const [error, setError] = useState(null)
   const [detail, setDetail] = useState(null)
   const [detailAction, setDetailAction] = useState(0)
+  const [detailExtra, setDetailExtra] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   const inputRef = useRef(null)
   const scrollRef = useRef(null)
@@ -256,6 +397,8 @@ export default function SimilarFinder({ onClose, library, hasToken, onNeedToken,
       if (!item) return
       setDetail({ item, local: localFor(item) })
       setDetailAction(0)
+      setDetailExtra(null)
+      setDetailLoading(typeof window.tv?.getDetails === 'function')
     },
     [localFor]
   )
@@ -324,6 +467,32 @@ export default function SimilarFinder({ onClose, library, hasToken, onNeedToken,
       if (id === requestRef.current) setLoading(false)
     }
   }, [])
+
+  const detailId = detail?.item.id
+  const detailKind = detail?.item.kind
+
+  useEffect(() => {
+    if (!detailId) return
+
+    let cancelled = false
+    const request = window.tv?.getDetails?.(detailId, detailKind)
+    if (!request) return
+
+    request
+      .then((res) => {
+        if (!cancelled) setDetailExtra(res?.ok ? res.details : null)
+      })
+      .catch(() => {
+        if (!cancelled) setDetailExtra(null)
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [detailId, detailKind])
 
   const detailActions = detail
     ? detail.local
@@ -676,6 +845,8 @@ export default function SimilarFinder({ onClose, library, hasToken, onNeedToken,
           onHoverAction={setDetailAction}
           onAction={(action) => action.run()}
           onClose={closeDetail}
+          extra={detailExtra}
+          loading={detailLoading}
         />
       )}
     </div>

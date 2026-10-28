@@ -37,6 +37,7 @@ let cache = null
 let cacheFile = null
 const searchCache = new Map()
 const similarCache = new Map()
+const detailsCache = new Map()
 
 function loadCache() {
   if (cache) return
@@ -58,6 +59,7 @@ function resetCache() {
   cache = {}
   searchCache.clear()
   similarCache.clear()
+  detailsCache.clear()
   try {
     fs.rmSync(path.join(app.getPath('userData'), 'meta-cache.json'), { force: true })
   } catch {}
@@ -176,6 +178,73 @@ async function getSimilar(id, kind) {
   }
 }
 
+async function getDetails(id, kind) {
+  const type = kind === 'tv' ? 'tv' : 'movie'
+  if (!id) return { ok: false, error: 'Missing title id' }
+
+  const token = readToken()
+  if (!token) return { ok: false, error: 'No TMDB token saved' }
+
+  const key = `${type}:${id}`
+  if (detailsCache.has(key)) return { ok: true, details: detailsCache.get(key) }
+
+  try {
+    const data = await request(token, `/${type}/${id}`, {
+      append_to_response: 'credits',
+      language: 'en-US',
+    })
+
+    const credits = data.credits || {}
+    const cast = (credits.cast || [])
+      .filter((person) => person.name)
+      .slice(0, 8)
+      .map((person) => ({
+        name: person.name,
+        character: person.character || '',
+        profile: person.profile_path ? `${IMG}/w185${person.profile_path}` : null,
+      }))
+
+    const directors = (credits.crew || [])
+      .filter((person) => person.job === 'Director')
+      .map((person) => person.name)
+      .filter(Boolean)
+      .slice(0, 2)
+
+    const creators = (data.created_by || [])
+      .map((person) => person.name)
+      .filter(Boolean)
+      .slice(0, 2)
+
+    const details = {
+      id: data.id,
+      kind: type,
+      overview: data.overview || '',
+      tagline: data.tagline || '',
+      status: data.status || '',
+      releaseDate: data.release_date || data.first_air_date || '',
+      runtime:
+        data.runtime ||
+        (Array.isArray(data.episode_run_time) ? data.episode_run_time[0] : null) ||
+        null,
+      seasons: data.number_of_seasons ?? null,
+      episodes: data.number_of_episodes ?? null,
+      genres: (data.genres || []).map((genre) => genre.name).filter(Boolean),
+      countries: (data.production_countries || [])
+        .map((country) => country.name)
+        .filter(Boolean)
+        .slice(0, 2),
+      directors,
+      creators,
+      cast,
+    }
+
+    detailsCache.set(key, details)
+    return { ok: true, details }
+  } catch (err) {
+    return { ok: false, error: err.message || 'TMDB details failed' }
+  }
+}
+
 async function verifyToken(token) {
   try {
     await search(token, 'Inception', null, 'movie')
@@ -219,4 +288,4 @@ async function getMeta(title, year, kind = 'movie') {
   }
 }
 
-module.exports = { getMeta, verifyToken, resetCache, searchTitles, getSimilar }
+module.exports = { getMeta, verifyToken, resetCache, searchTitles, getSimilar, getDetails }
